@@ -3,13 +3,24 @@ import api from '../api/apiService';
 
 const PendaftarContext = createContext();
 
+// Helper untuk ubah tanggal ISO ke format "yyyy-MM-dd"
+const formatDateForApi = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toISOString().split('T')[0]; // hasil: "2002-02-01"
+};
+
 export const PendaftarProvider = ({ children }) => {
   const [pendaftars, setPendaftars] = useState([]);
 
   const fetchPendaftars = async () => {
     try {
       const res = await api.get('/pendaftar');
-      setPendaftars(res.data.data); 
+      const data = res.data.data.map(p => ({
+        ...p,
+        tanggal_lahir: formatDateForApi(p.tanggal_lahir)
+      }));
+      setPendaftars(data);
     } catch (error) {
       console.error('Gagal fetch data:', error);
     }
@@ -17,7 +28,12 @@ export const PendaftarProvider = ({ children }) => {
 
   const addPendaftar = async (pendaftarData) => {
     try {
-      const response = await api.post('/pendaftar', pendaftarData);
+      const formattedData = {
+        ...pendaftarData,
+        tanggal_lahir: formatDateForApi(pendaftarData.tanggal_lahir)
+      };
+
+      const response = await api.post('/pendaftar', formattedData);
       if (response?.data) {
         setPendaftars(prev => Array.isArray(prev) ? [...prev, response.data] : [response.data]);
       }
@@ -31,9 +47,24 @@ export const PendaftarProvider = ({ children }) => {
     }
   };
 
-  const updatePendaftar = async (id, pendaftarData) => {
+  const updatePendaftar = async (id, updatedFields) => {
     try {
-      const response = await api.put(`/pendaftar/${id}`, pendaftarData);
+      const existing = pendaftars.find(p => p.id_pendaftar === id);
+      if (!existing) throw new Error('Data pendaftar tidak ditemukan');
+
+      // Gabungkan data lama + data baru
+      const mergedData = {
+        ...existing,
+        ...updatedFields,
+      };
+
+      const formattedData = {
+        ...mergedData,
+        tanggal_lahir: formatDateForApi(mergedData.tanggal_lahir)
+      };
+
+      const response = await api.put(`/pendaftar/${id}`, formattedData);
+
       if (response?.data) {
         setPendaftars(prev =>
           Array.isArray(prev)
